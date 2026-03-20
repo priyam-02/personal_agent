@@ -3,11 +3,14 @@ from __future__ import annotations
 import base64
 import email
 import logging
+import os
 import re
 from email.mime.text import MIMEText
 from dataclasses import dataclass
 
+import httplib2
 from google.oauth2.credentials import Credentials
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 
 logger = logging.getLogger("nemoclaw.gmail")
@@ -45,7 +48,15 @@ class GmailClient:
             token_uri="https://oauth2.googleapis.com/token",
             scopes=SCOPES,
         )
-        self.service = build("gmail", "v1", credentials=creds)
+        # Use proxy if available (required in NemoClaw sandbox)
+        proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        if proxy_url:
+            proxy_info = httplib2.proxy_info_from_url(proxy_url)
+            http = httplib2.Http(proxy_info=proxy_info)
+        else:
+            http = httplib2.Http()
+        authorized_http = AuthorizedHttp(creds, http=http)
+        self.service = build("gmail", "v1", http=authorized_http)
         self.user_email = self._get_user_email()
         logger.info(f"Gmail client initialized for {self.user_email}")
 
