@@ -8,10 +8,11 @@ import re
 from email.mime.text import MIMEText
 from dataclasses import dataclass
 
-import httplib2
+import requests as req_lib
 from google.oauth2.credentials import Credentials
-from google_auth_httplib2 import AuthorizedHttp
+from google.auth.transport.requests import AuthorizedSession, Request
 from googleapiclient.discovery import build
+from googleapiclient.http import HttpRequest
 
 logger = logging.getLogger("nemoclaw.gmail")
 
@@ -38,6 +39,30 @@ class EmailMessage:
     category: str
 
 
+class _HttpLib2Response(dict):
+    """Mimics httplib2.Response for googleapiclient compatibility."""
+
+    def __init__(self, requests_resp):
+        super().__init__()
+        self.status = requests_resp.status_code
+        self.reason = requests_resp.reason
+        self["status"] = str(requests_resp.status_code)
+        self["content-type"] = requests_resp.headers.get("content-type", "")
+        for key, val in requests_resp.headers.items():
+            self[key.lower()] = val
+
+
+class _RequestsHttpShim:
+    """Wraps AuthorizedSession to look like httplib2.Http for googleapiclient."""
+
+    def __init__(self, session: AuthorizedSession):
+        self._session = session
+
+    def request(self, uri, method="GET", body=None, headers=None, **kwargs):
+        resp = self._session.request(method, uri, data=body, headers=headers)
+        return _HttpLib2Response(resp), resp.content
+
+
 class GmailClient:
     def __init__(self, client_id: str, client_secret: str, refresh_token: str):
         creds = Credentials(
@@ -48,15 +73,12 @@ class GmailClient:
             token_uri="https://oauth2.googleapis.com/token",
             scopes=SCOPES,
         )
-        # Use proxy if available (required in NemoClaw sandbox)
-        proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-        if proxy_url:
-            proxy_info = httplib2.proxy_info_from_url(proxy_url)
-            http = httplib2.Http(proxy_info=proxy_info)
-        else:
-            http = httplib2.Http()
-        authorized_http = AuthorizedHttp(creds, http=http)
-        self.service = build("gmail", "v1", http=authorized_http)
+        # Force token refresh through requests (respects HTTPS_PROXY)
+        creds.refresh(Request())
+        # Use AuthorizedSession which respects env proxy vars
+        session = AuthorizedSession(creds)
+        http_shim = _RequestsHttpShim(session)
+        self.service = build("gmail", "v1", http=http_shim)
         self.user_email = self._get_user_email()
         logger.info(f"Gmail client initialized for {self.user_email}")
 
