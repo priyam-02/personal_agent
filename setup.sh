@@ -3,7 +3,7 @@
 #
 # Usage (from inside sandbox):
 #   1. Copy .env.example to .env and fill in your values
-#   2. bash /sandbox/setup.sh
+#   2. bash setup.sh
 
 set -euo pipefail
 
@@ -45,11 +45,7 @@ python3 -c "from src.database import get_db; get_db(); print('Database initializ
 chmod +x cron/check_email_cron.sh
 
 # Register cron job (every 2 minutes), passing env vars
-(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd $SCRIPT_DIR && set -a && . $SCRIPT_DIR/.env && set +a && $SCRIPT_DIR/cron/check_email_cron.sh") | crontab -
-
-# Apply network policy
-echo "Applying network policy..."
-openshell policy set "$SCRIPT_DIR/network-policy.yaml"
+(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd $SCRIPT_DIR && set -a && . $SCRIPT_DIR/.env && set +a && source $SCRIPT_DIR/.venv/bin/activate && $SCRIPT_DIR/cron/check_email_cron.sh") | crontab -
 
 # Start Telegram bridge
 echo "Starting Telegram bridge..."
