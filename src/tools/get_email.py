@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Get full details for a specific email by recency index."""
+"""Get full details for a specific email by recency index (skips noise)."""
 
 import argparse
 import json
 import sys
 
-from src.database import get_db, get_email_by_index
+from src.database import get_db, get_recent_emails
 
 
 def main():
@@ -14,11 +14,15 @@ def main():
     args = parser.parse_args()
 
     db = get_db()
-    email = get_email_by_index(db, args.index)
+    # Get enough emails to find the Nth non-skipped one
+    all_emails = get_recent_emails(db, limit=100)
+    visible = [e for e in all_emails if not e["summary"].startswith("[skipped")]
 
-    if not email:
+    if args.index < 1 or args.index > len(visible):
         json.dump({"error": f"Email #{args.index} not found"}, sys.stdout, indent=2)
         sys.exit(1)
+
+    email = visible[args.index - 1]
 
     output = {
         "email": {
