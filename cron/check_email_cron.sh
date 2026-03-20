@@ -8,12 +8,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-# Load env vars
+# Load env vars and venv
 if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a
     source "$SCRIPT_DIR/.env"
     set +a
 fi
+source "$SCRIPT_DIR/.venv/bin/activate"
 
 RESULT=$(python3 -m src.tools.check_email --max 10 2>/dev/null) || exit 0
 

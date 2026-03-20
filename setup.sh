@@ -28,6 +28,13 @@ set +a
 
 echo "Setting up Jarvis agent..."
 
+# Create and activate virtual environment
+if [ ! -d .venv ]; then
+    python3 -m venv .venv
+    echo "Created virtual environment at .venv/"
+fi
+source .venv/bin/activate
+
 # Install Python dependencies
 pip install -q -r requirements.txt
 
