@@ -44,12 +44,11 @@ python3 -c "from src.database import get_db; get_db(); print('Database initializ
 # Make cron script executable
 chmod +x cron/check_email_cron.sh
 
-# Register cron job (every 2 minutes), passing env vars
-(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd $SCRIPT_DIR && set -a && . $SCRIPT_DIR/.env && set +a && source $SCRIPT_DIR/.venv/bin/activate && $SCRIPT_DIR/cron/check_email_cron.sh") | crontab -
-
-# Start Telegram bridge
-echo "Starting Telegram bridge..."
-nemoclaw start
-
 echo ""
-echo "Jarvis is ready! Send 'check my email' via Telegram to test."
+echo "Setup complete!"
+echo ""
+echo "To test email checking:"
+echo "  source .venv/bin/activate && python3 -m src.tools.check_email --max 5"
+echo ""
+echo "To start Telegram bridge (from host machine):"
+echo "  nemoclaw start"
