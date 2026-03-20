@@ -1,29 +1,44 @@
 #!/bin/bash
-# Initialize the Nemoclaw agent environment inside a NemoClaw sandbox.
+# Initialize the Jarvis agent environment inside a NemoClaw sandbox.
 #
 # Usage (from inside sandbox):
-#   bash /sandbox/setup.sh
+#   1. Copy .env.example to .env and fill in your values
+#   2. bash /sandbox/setup.sh
 
 set -euo pipefail
 
-echo "Setting up Nemoclaw agent..."
+cd /sandbox
+
+# Load .env
+if [ ! -f .env ]; then
+    echo "Error: .env file not found. Copy .env.example to .env and fill in your values."
+    exit 1
+fi
+set -a
+source .env
+set +a
+
+echo "Setting up Jarvis agent..."
 
 # Install Python dependencies
-pip install -q -r /sandbox/requirements.txt
+pip install -q -r requirements.txt
 
 # Initialize the database
-python3 -c "from src.database import get_db; get_db(); print('Database initialized at', '/sandbox/nemoclaw.db')"
+python3 -c "from src.database import get_db; get_db(); print('Database initialized at $DB_PATH')"
 
 # Make cron script executable
-chmod +x /sandbox/cron/check_email_cron.sh
+chmod +x cron/check_email_cron.sh
 
-# Register cron job (every 2 minutes)
-(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * /sandbox/cron/check_email_cron.sh") | crontab -
+# Register cron job (every 2 minutes), passing env vars
+(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd /sandbox && set -a && . /sandbox/.env && set +a && /sandbox/cron/check_email_cron.sh") | crontab -
 
-echo "Nemoclaw agent setup complete."
+# Apply network policy
+echo "Applying network policy..."
+openshell policy set /sandbox/network-policy.yaml
+
+# Start Telegram bridge
+echo "Starting Telegram bridge..."
+nemoclaw start
+
 echo ""
-echo "Next steps:"
-echo "  1. Set Gmail env vars (see .env.example)"
-echo "  2. Apply network policy: openshell policy set /sandbox/network-policy.yaml"
-echo "  3. Start Telegram bridge: nemoclaw start (with TELEGRAM_BOT_TOKEN set)"
-echo "  4. Send 'check my email' via Telegram to test"
+echo "Jarvis is ready! Send 'check my email' via Telegram to test."
