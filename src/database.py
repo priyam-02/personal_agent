@@ -24,6 +24,7 @@ def _migrate(conn: sqlite3.Connection):
             gmail_id       TEXT PRIMARY KEY,
             thread_id      TEXT,
             sender         TEXT,
+            sender_email   TEXT,
             subject        TEXT,
             snippet        TEXT,
             summary        TEXT,
@@ -64,14 +65,15 @@ def save_processed_email(
     summary: str,
     telegram_msg_id: int | None = None,
     priority: str = "normal",
+    sender_email: str = "",
 ):
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
         """INSERT OR REPLACE INTO processed_emails
-           (gmail_id, thread_id, sender, subject, snippet, summary,
+           (gmail_id, thread_id, sender, sender_email, subject, snippet, summary,
             telegram_msg_id, priority, status, processed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'summarized', ?)""",
-        (gmail_id, thread_id, sender, subject, snippet, summary,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'summarized', ?)""",
+        (gmail_id, thread_id, sender, sender_email, subject, snippet, summary,
          telegram_msg_id, priority, now),
     )
     conn.commit()

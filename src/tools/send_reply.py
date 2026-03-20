@@ -33,7 +33,7 @@ def main():
 
     # Look up email in DB for thread context
     row = db.execute(
-        "SELECT thread_id, sender, subject FROM processed_emails WHERE gmail_id = ?",
+        "SELECT thread_id, sender, sender_email, subject FROM processed_emails WHERE gmail_id = ?",
         (args.gmail_id,),
     ).fetchone()
 
@@ -49,7 +49,7 @@ def main():
 
     sent_id = gmail.send_reply(
         thread_id=row["thread_id"],
-        to=row["sender"],
+        to=row["sender_email"] or row["sender"],
         subject=row["subject"],
         body=body,
     )

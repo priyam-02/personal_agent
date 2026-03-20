@@ -58,6 +58,7 @@ def main():
                 snippet=em.snippet,
                 summary=f"[skipped: {result.reason}]",
                 priority="low",
+                sender_email=em.sender_email,
             )
             skipped_count += 1
             continue
@@ -72,6 +73,7 @@ def main():
             snippet=em.snippet,
             summary="[pending agent summarization]",
             priority=result.priority,
+            sender_email=em.sender_email,
         )
 
         new_emails.append({
