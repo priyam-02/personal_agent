@@ -1,0 +1,18 @@
+# Network policy for Nemoclaw email agent in NemoClaw sandbox
+# Apply with: openshell policy set network-policy.yaml (session)
+# Or add to baseline policy and run: nemoclaw onboard (permanent)
+
+gmail:
+  endpoints:
+    - host: gmail.googleapis.com
+      port: 443
+    - host: oauth2.googleapis.com
+      port: 443
+    - host: www.googleapis.com
+      port: 443
+  binaries:
+    - /usr/bin/python3
+    - /usr/local/bin/python3
+  rules:
+    - methods: ["GET", "POST", "PUT"]
+      paths: ["/*"]
