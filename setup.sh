@@ -7,12 +7,20 @@
 
 set -euo pipefail
 
-cd /sandbox
+# Work from the directory where this script lives
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-# Load .env
+# Create .env from .env.example if it doesn't exist
 if [ ! -f .env ]; then
-    echo "Error: .env file not found. Copy .env.example to .env and fill in your values."
-    exit 1
+    if [ -f .env.example ]; then
+        cat .env.example > .env
+        echo "Created .env from .env.example — edit it with your values, then re-run this script."
+        exit 0
+    else
+        echo "Error: no .env or .env.example found."
+        exit 1
+    fi
 fi
 set -a
 source .env
@@ -30,11 +38,11 @@ python3 -c "from src.database import get_db; get_db(); print('Database initializ
 chmod +x cron/check_email_cron.sh
 
 # Register cron job (every 2 minutes), passing env vars
-(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd /sandbox && set -a && . /sandbox/.env && set +a && /sandbox/cron/check_email_cron.sh") | crontab -
+(crontab -l 2>/dev/null | grep -v check_email_cron; echo "*/2 * * * * cd $SCRIPT_DIR && set -a && . $SCRIPT_DIR/.env && set +a && $SCRIPT_DIR/cron/check_email_cron.sh") | crontab -
 
 # Apply network policy
 echo "Applying network policy..."
-openshell policy set /sandbox/network-policy.yaml
+openshell policy set "$SCRIPT_DIR/network-policy.yaml"
 
 # Start Telegram bridge
 echo "Starting Telegram bridge..."

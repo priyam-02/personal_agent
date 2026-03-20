@@ -5,12 +5,13 @@
 
 set -euo pipefail
 
-cd /sandbox
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR"
 
 # Load env vars
-if [ -f /sandbox/.env ]; then
+if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a
-    source /sandbox/.env
+    source "$SCRIPT_DIR/.env"
     set +a
 fi
 
@@ -23,5 +24,5 @@ print(len(data.get('new_emails', [])))
 " 2>/dev/null) || exit 0
 
 if [ "$NEW_COUNT" -gt "0" ]; then
-    echo "$RESULT" > /sandbox/pending_emails.json
+    echo "$RESULT" > "$SCRIPT_DIR/pending_emails.json"
 fi
