@@ -9,25 +9,14 @@ import json
 import sys
 
 from src.config import Config
-from src.database import get_db, is_processed, save_processed_email, get_recent_emails
+from src.database import get_db, is_processed, save_processed_email, get_recent_emails, update_conversation_context
 from src.gmail_client import GmailClient
 from src.classifier import classify_email
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Check Gmail for new emails")
-    parser.add_argument("--max", type=int, default=10, help="Max emails to fetch")
-    args = parser.parse_args()
-
-    config = Config.from_env()
-    db = get_db()
-    gmail = GmailClient(
-        client_id=config.gmail_client_id,
-        client_secret=config.gmail_client_secret,
-        refresh_token=config.gmail_refresh_token,
-    )
-
-    emails = gmail.fetch_new_messages(max_results=args.max)
+def check_for_new_emails(config, db, gmail, max_results=10):
+    """Core email checking logic. Returns dict with new_emails, skipped_count, total_fetched."""
+    emails = gmail.fetch_new_messages(max_results=max_results)
 
     # Count existing emails for index numbering
     existing_count = len(get_recent_emails(db, limit=10000))
@@ -88,11 +77,31 @@ def main():
             "date": em.date,
         })
 
-    output = {
+    # Track new important emails in conversation context
+    if new_emails:
+        update_conversation_context(db, [e["gmail_id"] for e in new_emails])
+
+    return {
         "new_emails": new_emails,
         "skipped_count": skipped_count,
         "total_fetched": len(emails),
     }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Check Gmail for new emails")
+    parser.add_argument("--max", type=int, default=10, help="Max emails to fetch")
+    args = parser.parse_args()
+
+    config = Config.from_env()
+    db = get_db()
+    gmail = GmailClient(
+        client_id=config.gmail_client_id,
+        client_secret=config.gmail_client_secret,
+        refresh_token=config.gmail_refresh_token,
+    )
+
+    output = check_for_new_emails(config, db, gmail, max_results=args.max)
     json.dump(output, sys.stdout, indent=2)
 
 

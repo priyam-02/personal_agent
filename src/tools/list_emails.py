@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 
-from src.database import get_db, get_recent_emails
+from src.database import get_db, get_recent_emails, update_conversation_context
 
 
 def main():
@@ -18,11 +18,13 @@ def main():
 
     # Filter out skipped emails and format
     visible = []
-    for i, em in enumerate(emails, 1):
+    counter = 0
+    for em in emails:
         if em["summary"].startswith("[skipped"):
             continue
+        counter += 1
         visible.append({
-            "index": i,
+            "index": counter,
             "gmail_id": em["gmail_id"],
             "sender": em["sender"],
             "subject": em["subject"],
@@ -31,6 +33,10 @@ def main():
             "summary": em["summary"],
             "processed_at": em["processed_at"],
         })
+
+    # Track all visible emails in conversation context
+    if visible:
+        update_conversation_context(db, [e["gmail_id"] for e in visible])
 
     output = {
         "emails": visible,

@@ -1,47 +1,83 @@
-# Check Email
+# Skill: Check Email
 
 ## Trigger
-- User says "check my email", "any new emails?", "check inbox", or similar
-- File `/sandbox/pending_emails.json` exists (written by cron)
+
+User says anything like: "check my email", "any new emails?", "check inbox", "what's new?", "new messages?"
 
 ## Workflow
 
-1. Run the check-email tool:
-   ```
-   python -m src.tools.check_email --max 10
-   ```
+### Step 1: Fetch emails
+```
+python -m src.tools.check_email --max 10
+```
 
-2. Parse the JSON output.
+### Step 2: Handle errors
 
-3. If `new_emails` is empty, tell the user: "No new important emails since last check."
+If the tool fails (exception, non-JSON output, or stderr):
+- Say: "Couldn't reach Gmail right now. Try again in a minute — if it keeps failing, the auth might need a refresh."
+- Do NOT retry automatically.
 
-4. For each email in `new_emails`:
-   - Read the `body_text` field
-   - Summarize in 2-3 sentences:
-     - Start with what action (if any) is needed
-     - Include key details: who wants what, by when, any amounts/dates
-     - If purely informational, say so
-   - Use casual, direct tone
+### Step 3: Handle empty results
 
-5. Present each email:
-   ```
-   [priority_icon] Email #[index]
-   From: [sender]
-   Subject: [subject]
+If `new_emails` is an empty array:
+- Say: "No new important emails since last check."
+- Do NOT explain the process or add filler.
 
-   [your summary]
+### Step 4: Summarize each email
 
-   To reply, say: "reply to #[index]"
-   ```
-   Use 🔴 for high priority, 📩 for normal.
+For each object in `new_emails`:
+1. Read the `body_text` field (this is the full email body — YOU summarize it)
+2. Apply the summarization rules from the system prompt
+3. Do NOT call any external API — you are the summarizer
 
-6. End with a brief count: "That's [N] new email(s). [M] were filtered out as noise."
+### Step 5: Format output
 
-## Summarization Guidelines
-- 2-3 sentences MAX
-- Lead with action needed from the user
-- Include key details: who, what, by when, amounts, dates
-- If informational only (no action needed), say so
-- Never include email signatures, footers, or unsubscribe info
-- For calendar invites: extract event name, date/time, location
-- For threads: focus on the latest message, not the full history
+Present each email using this template:
+
+```
+[icon] <b>Email #[index]</b>
+From: [sender]
+Subject: [subject]
+
+[your 2-3 sentence summary]
+
+→ Reply: <code>reply to #[index]</code>
+```
+
+Use 🔴 for `priority: "high"`, 📩 for `priority: "normal"`.
+
+After all emails:
+"[N] new email(s). [skipped_count] filtered as noise."
+
+### Complete Example
+
+User: "check my email"
+
+Jarvis:
+```
+🔴 <b>Email #4</b>
+From: Lisa Park
+Subject: Urgent: Contract review needed
+
+She needs you to review the vendor contract and sign by EOD Wednesday. Contract value is $120K — legal has approved their side.
+
+→ Reply: <code>reply to #4</code>
+
+📩 <b>Email #5</b>
+From: Dev Team
+Subject: Sprint retrospective notes
+
+FYI only — no action needed. Velocity was up 15% last sprint, two bugs carried over.
+
+→ Reply: <code>reply to #5</code>
+
+2 new email(s). 4 filtered as noise.
+```
+
+### What NOT to Do
+
+- Do NOT call any external API or LLM to summarize — you ARE the summarizer
+- Do NOT include email signatures or footers in summaries
+- Do NOT say "Let me check your email for you" before running the tool
+- Do NOT list skipped/filtered emails — just mention the count
+- Do NOT add commentary ("Busy day!" or "Looks quiet")

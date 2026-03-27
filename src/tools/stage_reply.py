@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Send a reply to an email via Gmail within the original thread."""
+"""Stage a reply draft for user confirmation. Does NOT send."""
 
 import argparse
 import json
+import secrets
 import sys
+from datetime import datetime, timezone
 
-from src.config import Config
-from src.database import get_db, update_email_status
-from src.gmail_client import GmailClient
+from src.database import get_db, set_state
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Send email reply")
+    parser = argparse.ArgumentParser(description="Stage a reply draft")
     parser.add_argument("--gmail-id", required=True, help="Gmail message ID to reply to")
     parser.add_argument("--body-file", required=True, help="Path to file containing reply body")
     args = parser.parse_args()
 
-    # Read reply body from file (avoids shell escaping issues)
+    # Read reply body from file
     try:
         with open(args.body_file) as f:
             body = f.read().strip()
@@ -28,7 +28,6 @@ def main():
         json.dump({"error": "Reply body is empty"}, sys.stdout, indent=2)
         sys.exit(1)
 
-    config = Config.from_env()
     db = get_db()
 
     # Look up email in DB for thread context
@@ -41,26 +40,28 @@ def main():
         json.dump({"error": f"Email {args.gmail_id} not found in database"}, sys.stdout, indent=2)
         sys.exit(1)
 
-    gmail = GmailClient(
-        client_id=config.gmail_client_id,
-        client_secret=config.gmail_client_secret,
-        refresh_token=config.gmail_refresh_token,
-    )
-
-    sent_id = gmail.send_reply(
-        thread_id=row["thread_id"],
-        to=row["sender_email"] or row["sender"],
-        subject=row["subject"],
-        body=body,
-    )
-
-    update_email_status(db, args.gmail_id, "replied")
+    # Generate confirmation token and store the draft
+    token = secrets.token_hex(4)
+    pending = json.dumps({
+        "gmail_id": args.gmail_id,
+        "thread_id": row["thread_id"],
+        "recipient": row["sender_email"] or row["sender"],
+        "sender_name": row["sender"],
+        "subject": row["subject"],
+        "body": body,
+        "token": token,
+        "staged_at": datetime.now(timezone.utc).isoformat(),
+    })
+    set_state(db, "pending_reply", pending)
 
     output = {
-        "success": True,
-        "sent_message_id": sent_id,
-        "replied_to": row["sender"],
+        "staged": True,
+        "confirm_token": token,
+        "draft_preview": body,
+        "recipient": row["sender_email"] or row["sender"],
+        "recipient_name": row["sender"],
         "subject": row["subject"],
+        "instructions": "Show this draft to the user. Only call confirm_send after they approve.",
     }
     json.dump(output, sys.stdout, indent=2)
 

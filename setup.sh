@@ -41,8 +41,9 @@ pip install -q -r requirements.txt
 # Initialize the database
 python3 -c "from src.database import get_db; get_db(); print('Database initialized at $DB_PATH')"
 
-# Make cron script executable
+# Make scripts executable
 chmod +x cron/check_email_cron.sh
+chmod +x cron/start_poller.sh
 
 echo ""
 echo "Setup complete!"
@@ -50,5 +51,9 @@ echo ""
 echo "To test email checking:"
 echo "  source .venv/bin/activate && python3 -m src.tools.check_email --max 5"
 echo ""
+echo "To start the email poller (sends Telegram notifications for new emails):"
+echo "  bash cron/start_poller.sh"
+echo ""
 echo "To start Telegram bridge (from host machine):"
+echo "  export SANDBOX_NAME=jarvis"
 echo "  nemoclaw start"

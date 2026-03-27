@@ -119,3 +119,67 @@ def set_state(conn: sqlite3.Connection, key: str, value: str):
         (key, value),
     )
     conn.commit()
+
+
+def search_emails(conn: sqlite3.Connection, query: str, limit: int = 5) -> list[dict]:
+    """Search emails by sender, subject, or snippet. Returns non-skipped matches."""
+    pattern = f"%{query}%"
+    rows = conn.execute(
+        """SELECT * FROM processed_emails
+           WHERE (sender LIKE ? OR subject LIKE ? OR snippet LIKE ?)
+             AND summary NOT LIKE '[skipped%'
+           ORDER BY processed_at DESC LIMIT ?""",
+        (pattern, pattern, pattern, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_email_by_gmail_id(conn: sqlite3.Connection, gmail_id: str) -> dict | None:
+    """Get an email by its Gmail message ID."""
+    row = conn.execute(
+        "SELECT * FROM processed_emails WHERE gmail_id = ?", (gmail_id,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def update_conversation_context(conn: sqlite3.Connection, gmail_ids: list[str]):
+    """Track which emails were recently discussed. Capped at 20 entries."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Load existing context
+    raw = get_state(conn, "conversation_context", "[]")
+    try:
+        context = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        context = []
+
+    # Look up email details for the new IDs
+    existing_ids = {entry["gmail_id"] for entry in context}
+    for gid in gmail_ids:
+        if gid in existing_ids:
+            # Move to front
+            context = [e for e in context if e["gmail_id"] != gid]
+        row = conn.execute(
+            "SELECT gmail_id, sender, subject FROM processed_emails WHERE gmail_id = ?",
+            (gid,),
+        ).fetchone()
+        if row:
+            context.insert(0, {
+                "gmail_id": row["gmail_id"],
+                "sender": row["sender"],
+                "subject": row["subject"],
+                "discussed_at": now,
+            })
+
+    # Cap at 20
+    context = context[:20]
+    set_state(conn, "conversation_context", json.dumps(context))
+
+
+def get_conversation_context(conn: sqlite3.Connection) -> list[dict]:
+    """Get recently discussed emails (most recent first)."""
+    raw = get_state(conn, "conversation_context", "[]")
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
